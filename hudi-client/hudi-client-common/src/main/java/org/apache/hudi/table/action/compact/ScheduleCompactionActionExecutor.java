@@ -179,6 +179,26 @@ public class ScheduleCompactionActionExecutor<T extends HoodieRecordPayload, I, 
               inlineCompactDeltaSecondsMax));
         }
         break;
+      case SYSTEM_TIME:
+        compactable = inlineCompactDeltaSecondsMax <= System.currentTimeMillis()/1000 - parsedToSeconds(latestDeltaCommitInfo.getRight());
+        if (compactable) {
+          LOG.info(String.format("The system time >=%ss, trigger compaction scheduler.", inlineCompactDeltaSecondsMax));
+        }
+        break;
+      case NUM_AND_SYSTEM_TIME:
+        compactable = inlineCompactDeltaCommitMax <= latestDeltaCommitInfo.getLeft()
+          && inlineCompactDeltaSecondsMax <= System.currentTimeMillis()/1000 - parsedToSeconds(latestDeltaCommitInfo.getRight());
+        if (compactable) {
+          LOG.info(String.format("The delta commits >= %s and system_time >=%ss, trigger compaction scheduler.", inlineCompactDeltaSecondsMax));
+        }
+        break;
+      case NUM_OR_SYSTEM_TIME:
+        compactable = inlineCompactDeltaCommitMax <= latestDeltaCommitInfo.getLeft()
+          || inlineCompactDeltaSecondsMax <= System.currentTimeMillis()/1000 - parsedToSeconds(latestDeltaCommitInfo.getRight());
+        if (compactable) {
+          LOG.info(String.format("The delta commits >= %s or system_time >=%ss, trigger compaction scheduler.", inlineCompactDeltaSecondsMax));
+        }
+        break;
       default:
         throw new HoodieCompactionException("Unsupported compaction trigger strategy: " + config.getInlineCompactTriggerStrategy());
     }

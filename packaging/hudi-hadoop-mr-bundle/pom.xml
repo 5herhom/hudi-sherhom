@@ -19,7 +19,7 @@
   <parent>
     <artifactId>hudi</artifactId>
     <groupId>org.apache.hudi</groupId>
-    <version>0.11.0</version>
+    <version>0.11.0-bi</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
@@ -223,6 +223,8 @@
                     <exclude>META-INF/services/javax.*</exclude>
                     <exclude>**/*.proto</exclude>
                     <exclude>hbase-webapps/**</exclude>
+                    <exclude>hbase-site.xml</exclude>
+                    <exclude>hbase-default.xml</exclude>
                   </excludes>
                 </filter>
               </filters>

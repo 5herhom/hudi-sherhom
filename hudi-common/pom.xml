@@ -19,7 +19,7 @@
   <parent>
     <artifactId>hudi</artifactId>
     <groupId>org.apache.hudi</groupId>
-    <version>0.11.0</version>
+    <version>0.11.0-bi</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
@@ -269,6 +269,11 @@
       <groupId>joda-time</groupId>
       <artifactId>joda-time</artifactId>
       <scope>test</scope>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/com.qcloud/chdfs_hadoop_plugin_network -->
+    <dependency>
+      <groupId>com.qcloud</groupId>
+      <artifactId>chdfs_hadoop_plugin_network</artifactId>
     </dependency>
 
   </dependencies>

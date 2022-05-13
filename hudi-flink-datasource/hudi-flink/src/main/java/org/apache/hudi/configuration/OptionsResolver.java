@@ -92,7 +92,11 @@ public class OptionsResolver {
    */
   public static boolean isDeltaTimeCompaction(Configuration conf) {
     final String strategy = conf.getString(FlinkOptions.COMPACTION_TRIGGER_STRATEGY).toLowerCase(Locale.ROOT);
-    return FlinkOptions.TIME_ELAPSED.equals(strategy) || FlinkOptions.NUM_OR_TIME.equals(strategy);
+    return FlinkOptions.TIME_ELAPSED.equals(strategy)
+      || FlinkOptions.NUM_OR_TIME.equals(strategy)
+      || FlinkOptions.SYSTEM_TIME.equals(strategy)
+      || FlinkOptions.NUM_OR_SYSTEM_TIME.equals(strategy)
+      ;
   }
 
   /**

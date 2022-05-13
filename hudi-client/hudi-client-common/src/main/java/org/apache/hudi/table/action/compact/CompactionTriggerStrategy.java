@@ -26,5 +26,11 @@ public enum CompactionTriggerStrategy {
     // trigger compaction when both NUM_COMMITS and TIME_ELAPSED are satisfied
     NUM_AND_TIME,
     // trigger compaction when NUM_COMMITS or TIME_ELAPSED is satisfied
-    NUM_OR_TIME
+    NUM_OR_TIME,
+    // trigger compaction when system time > N seconds since last compaction
+    SYSTEM_TIME,
+    // trigger compaction when both NUM_COMMITS and SYSTEM_TIME are satisfied
+    NUM_AND_SYSTEM_TIME,
+    // trigger compaction when NUM_COMMITS or SYSTEM_TIME is satisfied
+    NUM_OR_SYSTEM_TIME,
 }

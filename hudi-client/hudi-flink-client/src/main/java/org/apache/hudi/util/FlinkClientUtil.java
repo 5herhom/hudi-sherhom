@@ -23,6 +23,8 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.flink.api.java.hadoop.mapred.utils.HadoopUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 
@@ -30,6 +32,7 @@ import java.io.File;
  * Utilities for Hoodie Flink client.
  */
 public class FlinkClientUtil {
+  private static final Logger LOG = LoggerFactory.getLogger(FlinkClientUtil.class);
 
   /**
    * Creates the meta client.
@@ -48,12 +51,16 @@ public class FlinkClientUtil {
     for (String possibleHadoopConfPath : HadoopUtils.possibleHadoopConfPaths(new Configuration())) {
       hadoopConf = getHadoopConfiguration(possibleHadoopConfPath);
       if (hadoopConf != null) {
+        LOG.info("Found hadoop config in path:{}", possibleHadoopConfPath);
         break;
       }
     }
     if (hadoopConf == null) {
       hadoopConf = new org.apache.hadoop.conf.Configuration();
     }
+    hadoopConf.set("fs.default.name", "ofs://f4mbyxvfbgn-qZsF.chdfs.ap-beijing.myqcloud.com");
+    hadoopConf.set("fs.AbstractFileSystem.ofs.impl", "com.qcloud.chdfs.fs.CHDFSDelegateFSAdapter");
+    hadoopConf.set("fs.ofs.impl", "com.qcloud.chdfs.fs.CHDFSHadoopFileSystemAdapter");
     return hadoopConf;
   }
 

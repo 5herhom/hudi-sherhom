@@ -29,7 +29,7 @@
   <groupId>org.apache.hudi</groupId>
   <artifactId>hudi</artifactId>
   <packaging>pom</packaging>
-  <version>0.11.0</version>
+  <version>0.11.0-bi</version>
   <description>Apache Hudi brings stream style processing on big data</description>
   <url>https://github.com/apache/hudi</url>
   <name>Hudi</name>
@@ -123,9 +123,9 @@
     <sparkbundle.version></sparkbundle.version>
     <flink1.14.version>1.14.4</flink1.14.version>
     <flink1.13.version>1.13.6</flink1.13.version>
-    <flink.version>${flink1.14.version}</flink.version>
-    <hudi.flink.module>hudi-flink1.14.x</hudi.flink.module>
-    <flink.bundle.version>1.14</flink.bundle.version>
+    <flink.version>${flink1.13.version}</flink.version>
+    <hudi.flink.module>hudi-flink1.13.x</hudi.flink.module>
+    <flink.bundle.version>1.13</flink.bundle.version>
     <flink.runtime.artifactId>flink-runtime</flink.runtime.artifactId>
     <flink.table.runtime.artifactId>flink-table-runtime_${scala.binary.version}</flink.table.runtime.artifactId>
     <flink.table.planner.artifactId>flink-table-planner_${scala.binary.version}</flink.table.planner.artifactId>
@@ -148,7 +148,7 @@
     <thrift.version>0.12.0</thrift.version>
     <jetty.version>9.4.15.v20190215</jetty.version>
     <htrace.version>3.1.0-incubating</htrace.version>
-    <hbase.version>2.4.9</hbase.version>
+    <hbase.version>2.3.7</hbase.version>
     <hbase-thirdparty.version>3.5.1</hbase-thirdparty.version>
     <codehaus-jackson.version>1.9.13</codehaus-jackson.version>
     <h2.version>1.4.199</h2.version>
@@ -1163,6 +1163,13 @@
         <artifactId>log4j-core</artifactId>
         <version>${log4j.test.version}</version>
         <scope>test</scope>
+      </dependency>
+      <!-- https://mvnrepository.com/artifact/com.qcloud/chdfs_hadoop_plugin_network -->
+      <dependency>
+        <groupId>com.qcloud</groupId>
+        <artifactId>chdfs_hadoop_plugin_network</artifactId>
+        <version>2.0</version>
+        <scope>provided</scope>
       </dependency>
 
     </dependencies>

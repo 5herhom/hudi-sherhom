@@ -503,6 +503,9 @@ public class FlinkOptions extends HoodieConfig {
   public static final String TIME_ELAPSED = "time_elapsed";
   public static final String NUM_AND_TIME = "num_and_time";
   public static final String NUM_OR_TIME = "num_or_time";
+  public static final String SYSTEM_TIME = "system_time";
+  public static final String NUM_AND_SYSTEM_TIME = "num_and_system_time";
+  public static final String NUM_OR_SYSTEM_TIME = "num_or_system_time";
   public static final ConfigOption<String> COMPACTION_TRIGGER_STRATEGY = ConfigOptions
       .key("compaction.trigger.strategy")
       .stringType()
@@ -511,6 +514,9 @@ public class FlinkOptions extends HoodieConfig {
           + "'time_elapsed': trigger compaction when time elapsed > N seconds since last compaction;\n"
           + "'num_and_time': trigger compaction when both NUM_COMMITS and TIME_ELAPSED are satisfied;\n"
           + "'num_or_time': trigger compaction when NUM_COMMITS or TIME_ELAPSED is satisfied.\n"
+          + "'system_time': trigger compaction when system time > N seconds since last compaction.\n"
+          + "'num_and_system_time': trigger compaction when NUM_COMMITS and SYSTEM_TIME is satisfied.\n"
+          + "'num_or_system_time': trigger compaction when NUM_COMMITS or SYSTEM_TIME is satisfied.\n"
           + "Default is 'num_commits'");
 
   public static final ConfigOption<Integer> COMPACTION_DELTA_COMMITS = ConfigOptions
