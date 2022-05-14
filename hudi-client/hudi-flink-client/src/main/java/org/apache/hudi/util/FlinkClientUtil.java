@@ -58,9 +58,9 @@ public class FlinkClientUtil {
     if (hadoopConf == null) {
       hadoopConf = new org.apache.hadoop.conf.Configuration();
     }
-    hadoopConf.set("fs.default.name", "ofs://f4mbyxvfbgn-qZsF.chdfs.ap-beijing.myqcloud.com");
-    hadoopConf.set("fs.AbstractFileSystem.ofs.impl", "com.qcloud.chdfs.fs.CHDFSDelegateFSAdapter");
-    hadoopConf.set("fs.ofs.impl", "com.qcloud.chdfs.fs.CHDFSHadoopFileSystemAdapter");
+//    hadoopConf.set("fs.default.name", "ofs://f4mbyxvfbgn-qZsF.chdfs.ap-beijing.myqcloud.com");
+//    hadoopConf.set("fs.AbstractFileSystem.ofs.impl", "com.qcloud.chdfs.fs.CHDFSDelegateFSAdapter");
+//    hadoopConf.set("fs.ofs.impl", "com.qcloud.chdfs.fs.CHDFSHadoopFileSystemAdapter");
     return hadoopConf;
   }
 
