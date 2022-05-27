@@ -250,8 +250,8 @@ public class StreamerUtil {
   public static HoodieTableMetaClient initTableIfNotExists(Configuration conf) throws IOException {
     final String basePath = conf.getString(FlinkOptions.PATH);
     final org.apache.hadoop.conf.Configuration hadoopConf = StreamerUtil.getHadoopConf();
-    LOG.warn("initTableIfNotExists:print conf:");
-    hadoopConf.forEach(e -> LOG.info(e.getKey() + "=" + e.getValue()));
+//    LOG.info("initTableIfNotExists:print conf:");
+//    hadoopConf.forEach(e -> LOG.info(e.getKey() + "=" + e.getValue()));
     if (!tableExists(basePath, hadoopConf)) {
       HoodieTableMetaClient metaClient = HoodieTableMetaClient.withPropertyBuilder()
         .setTableCreateSchema(conf.getString(FlinkOptions.SOURCE_AVRO_SCHEMA))

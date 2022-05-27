@@ -48,6 +48,8 @@ import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.hadoop.realtime.HoodieVirtualKeyInfo;
 import org.apache.hudi.hadoop.utils.HoodieHiveUtils;
 import org.apache.hudi.hadoop.utils.HoodieInputFormatUtils;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -71,10 +73,11 @@ import static org.apache.hudi.common.util.ValidationUtils.checkState;
  *   <li>Incremental mode: reading table's state as of particular timestamp (or instant, in Hudi's terms)</li>
  *   <li>External mode: reading non-Hudi partitions</li>
  * </ul>
- *
+ * <p>
  * NOTE: This class is invariant of the underlying file-format of the files being read
  */
 public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
+  public static final Logger LOG = LogManager.getLogger(HoodieCopyOnWriteTableInputFormat.class);
 
   @Override
   protected boolean isSplitable(FileSystem fs, Path filename) {
@@ -87,7 +90,7 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
     FileSplit split = new FileSplit(file, start, length, hosts);
 
     if (file instanceof PathWithBootstrapFileStatus) {
-      return makeExternalFileSplit((PathWithBootstrapFileStatus)file, split);
+      return makeExternalFileSplit((PathWithBootstrapFileStatus) file, split);
     }
     return split;
   }
@@ -97,7 +100,7 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
                                 String[] hosts, String[] inMemoryHosts) {
     FileSplit split = new FileSplit(file, start, length, hosts, inMemoryHosts);
     if (file instanceof PathWithBootstrapFileStatus) {
-      return makeExternalFileSplit((PathWithBootstrapFileStatus)file, split);
+      return makeExternalFileSplit((PathWithBootstrapFileStatus) file, split);
     }
     return split;
   }
@@ -111,6 +114,7 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
 
     Map<String, HoodieTableMetaClient> tableMetaClientMap = inputPathHandler.getTableMetaClientMap();
     // process incremental pulls first
+    List<FileStatus> incrementalFileStatus = new ArrayList<>();
     for (String table : incrementalTables) {
       HoodieTableMetaClient metaClient = tableMetaClientMap.get(table);
       if (metaClient == null) {
@@ -122,22 +126,29 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
       List<Path> inputPaths = inputPathHandler.getGroupedIncrementalPaths().get(metaClient);
       List<FileStatus> result = listStatusForIncrementalMode(job, metaClient, inputPaths, table);
       if (result != null) {
-        returns.addAll(result);
+        incrementalFileStatus.addAll(result);
       }
     }
+    LOG.info("Found incrementalFileStatus "+incrementalFileStatus.size()+" :[" +
+      incrementalFileStatus.stream().map(e->e.getPath().toString()).collect(Collectors.joining(",")) + "]");
+    returns.addAll(incrementalFileStatus);
 
     // process non hoodie Paths next.
     List<Path> nonHoodiePaths = inputPathHandler.getNonHoodieInputPaths();
     if (nonHoodiePaths.size() > 0) {
       setInputPaths(job, nonHoodiePaths.toArray(new Path[nonHoodiePaths.size()]));
       FileStatus[] fileStatuses = doListStatus(job);
-      returns.addAll(Arrays.asList(fileStatuses));
+      List<FileStatus> nonHoodieFileStatus = Arrays.asList(fileStatuses);
+      LOG.info("Found nonHoodieFileStatus "+nonHoodieFileStatus.size()+" :[" + nonHoodieFileStatus.stream().map(e->e.getPath().toString()).collect(Collectors.joining(",")) + "]");
+      returns.addAll(nonHoodieFileStatus);
     }
 
     // process snapshot queries next.
     List<Path> snapshotPaths = inputPathHandler.getSnapshotPaths();
     if (snapshotPaths.size() > 0) {
-      returns.addAll(listStatusForSnapshotMode(job, tableMetaClientMap, snapshotPaths));
+      List<FileStatus> snapshotStatus = listStatusForSnapshotMode(job, tableMetaClientMap, snapshotPaths);
+      LOG.info("Found snapshotStatus "+snapshotStatus.size()+" :[" + snapshotStatus.stream().map(e->e.getPath().toString()).collect(Collectors.joining(",")) + "]");
+      returns.addAll(snapshotStatus);
     }
     return returns.toArray(new FileStatus[0]);
   }
@@ -199,7 +210,7 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
       LOG.info("Making external data split for " + file);
       FileStatus externalFileStatus = file.getBootstrapFileStatus();
       FileSplit externalFileSplit = makeSplit(externalFileStatus.getPath(), 0, externalFileStatus.getLen(),
-          new String[0], new String[0]);
+        new String[0], new String[0]);
       return new BootstrapBaseFileSplit(split, externalFileSplit);
     } catch (IOException e) {
       throw new HoodieIOException(e.getMessage(), e);
@@ -216,7 +227,7 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
     TypedProperties props = new TypedProperties(new Properties());
 
     Map<HoodieTableMetaClient, List<Path>> groupedPaths =
-        HoodieInputFormatUtils.groupSnapshotPathsByMetaClient(tableMetaClientMap.values(), snapshotPaths);
+      HoodieInputFormatUtils.groupSnapshotPathsByMetaClient(tableMetaClientMap.values(), snapshotPaths);
 
     for (Map.Entry<HoodieTableMetaClient, List<Path>> entry : groupedPaths.entrySet()) {
       HoodieTableMetaClient tableMetaClient = entry.getKey();
@@ -225,31 +236,31 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
       // Hive job might specify a max commit instant up to which table's state
       // should be examined. We simply pass it as query's instant to the file-index
       Option<String> queryCommitInstant =
-          HoodieHiveUtils.getMaxCommit(job, tableMetaClient.getTableConfig().getTableName());
+        HoodieHiveUtils.getMaxCommit(job, tableMetaClient.getTableConfig().getTableName());
 
       boolean shouldIncludePendingCommits =
-          HoodieHiveUtils.shouldIncludePendingCommits(job, tableMetaClient.getTableConfig().getTableName());
+        HoodieHiveUtils.shouldIncludePendingCommits(job, tableMetaClient.getTableConfig().getTableName());
 
       HiveHoodieTableFileIndex fileIndex =
-          new HiveHoodieTableFileIndex(
-              engineContext,
-              tableMetaClient,
-              props,
-              HoodieTableQueryType.SNAPSHOT,
-              partitionPaths,
-              queryCommitInstant,
-              shouldIncludePendingCommits);
+        new HiveHoodieTableFileIndex(
+          engineContext,
+          tableMetaClient,
+          props,
+          HoodieTableQueryType.SNAPSHOT,
+          partitionPaths,
+          queryCommitInstant,
+          shouldIncludePendingCommits);
 
       Map<String, List<FileSlice>> partitionedFileSlices = fileIndex.listFileSlices();
 
       Option<HoodieVirtualKeyInfo> virtualKeyInfoOpt = getHoodieVirtualKeyInfo(tableMetaClient);
 
       targetFiles.addAll(
-          partitionedFileSlices.values()
-              .stream()
-              .flatMap(Collection::stream)
-              .map(fileSlice -> createFileStatusUnchecked(fileSlice, fileIndex, virtualKeyInfoOpt))
-              .collect(Collectors.toList())
+        partitionedFileSlices.values()
+          .stream()
+          .flatMap(Collection::stream)
+          .map(fileSlice -> createFileStatusUnchecked(fileSlice, fileIndex, virtualKeyInfoOpt))
+          .collect(Collectors.toList())
       );
     }
 
@@ -280,11 +291,11 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
     try {
       Schema schema = tableSchemaResolver.getTableAvroSchema();
       return Option.of(
-          new HoodieVirtualKeyInfo(
-              tableConfig.getRecordKeyFieldProp(),
-              tableConfig.getPartitionFieldProp(),
-              schema.getField(tableConfig.getRecordKeyFieldProp()).pos(),
-              schema.getField(tableConfig.getPartitionFieldProp()).pos()));
+        new HoodieVirtualKeyInfo(
+          tableConfig.getRecordKeyFieldProp(),
+          tableConfig.getPartitionFieldProp(),
+          schema.getField(tableConfig.getRecordKeyFieldProp()).pos(),
+          schema.getField(tableConfig.getPartitionFieldProp()).pos()));
     } catch (Exception exception) {
       throw new HoodieException("Fetching table schema failed with exception ", exception);
     }
