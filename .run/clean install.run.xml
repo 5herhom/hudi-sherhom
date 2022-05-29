@@ -17,6 +17,9 @@
               <option value="-Dcheckstyle.skip" />
               <option value="-Pflink1.13" />
               <option value="source:jar" />
+              <option value="-DproxySet=true" />
+              <option value="-DproxyHost=127.0.0.1" />
+              <option value="-DproxyPort=7890" />
             </list>
           </option>
           <option name="pomFileName" />

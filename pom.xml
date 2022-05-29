@@ -127,9 +127,12 @@
     <flink.version>${flink1.13.version}</flink.version>
     <hudi.flink.module>hudi-flink1.13.x</hudi.flink.module>
     <flink.bundle.version>1.13</flink.bundle.version>
-    <flink.runtime.artifactId>flink-runtime</flink.runtime.artifactId>
-    <flink.table.runtime.artifactId>flink-table-runtime_${scala.binary.version}</flink.table.runtime.artifactId>
-    <flink.table.planner.artifactId>flink-table-planner_${scala.binary.version}</flink.table.planner.artifactId>
+<!--    <flink.runtime.artifactId>flink-runtime</flink.runtime.artifactId>-->
+    <flink.runtime.artifactId>flink-runtime_${scala.binary.version}</flink.runtime.artifactId>
+<!--    <flink.table.runtime.artifactId>flink-table-runtime_${scala.binary.version}-->
+    <flink.table.runtime.artifactId>flink-table-runtime-blink_${scala.binary.version}</flink.table.runtime.artifactId>
+<!--    <flink.table.planner.artifactId>flink-table-planner_${scala.binary.version}</flink.table.planner.artifactId>-->
+    <flink.table.planner.artifactId>flink-table-planner-blink_${scala.binary.version}</flink.table.planner.artifactId>
     <flink.format.parquet.version>1.12.2</flink.format.parquet.version>
     <spark31.version>3.1.3</spark31.version>
     <spark32.version>3.2.1</spark32.version>
@@ -1752,7 +1755,6 @@
     <profile>
       <id>flink1.14</id>
       <activation>
-        <activeByDefault>true</activeByDefault>
         <property>
           <name>flink1.14</name>
           <!-- add flink1.14 module to all profile -->
@@ -1772,6 +1774,7 @@
         <skipITs>true</skipITs>
       </properties>
       <activation>
+        <activeByDefault>true</activeByDefault>
         <property>
           <name>flink1.13</name>
         </property>

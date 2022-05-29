@@ -1,6 +1,8 @@
 package org.apache.hudi.util.bucket;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -8,28 +10,43 @@ import java.util.Map;
  * @date 2022/05/27 18:57
  */
 public class SubTaskGroup {
-  private int groupId;
-  private Map<Integer, SubTaskAssignInfo> taskNoToSubTaskInfo = new HashMap<>();
+    private final int groupId;
+    private Map<Integer, SubTaskAssignInfo> taskIdToSubTaskInfo = new HashMap<>();
+    private List<SubTaskAssignInfo> subTaskList = new ArrayList<>();
 
-  public int getGroupId() {
-    return groupId;
-  }
+    public SubTaskGroup(int groupId) {
+        this.groupId = groupId;
+    }
 
-  public void setGroupId(int groupId) {
-    this.groupId = groupId;
-  }
+    public int getGroupId() {
+        return groupId;
+    }
 
-  public Map<Integer, SubTaskAssignInfo> getTaskNoToSubTaskInfo() {
-    return taskNoToSubTaskInfo;
-  }
+    public Map<Integer, SubTaskAssignInfo> getTaskIdToSubTaskInfo() {
+        return taskIdToSubTaskInfo;
+    }
 
-  public void addSubTaskInfo(SubTaskAssignInfo subTaskAssignInfo) {
-    taskNoToSubTaskInfo.put(subTaskAssignInfo.getTaskId(), subTaskAssignInfo);
-  }
-  public SubTaskAssignInfo getSubTaskInfo(Integer taskId){
-    return taskNoToSubTaskInfo.get(taskId);
-  }
-  public void setTaskNoToSubTaskInfo(Map<Integer, SubTaskAssignInfo> taskNoToSubTaskInfo) {
-    this.taskNoToSubTaskInfo = taskNoToSubTaskInfo;
-  }
+    public void addSubTaskInfo(SubTaskAssignInfo subTaskAssignInfo) {
+        taskIdToSubTaskInfo.put(subTaskAssignInfo.getTaskId(), subTaskAssignInfo);
+        subTaskList.add(subTaskAssignInfo);
+    }
+
+    public SubTaskAssignInfo getSubTaskInfoById(Integer taskId) {
+        return taskIdToSubTaskInfo.get(taskId);
+    }
+
+    public SubTaskAssignInfo getSubTaskInfoByPosition(Integer position) {
+        return subTaskList.get(position);
+    }
+    public int size(){
+        return subTaskList.size();
+    }
+
+    @Override
+    public String toString() {
+        return "SubTaskGroup{" +
+                "groupId=" + groupId +
+                ", subTaskList=" + subTaskList +
+                '}';
+    }
 }

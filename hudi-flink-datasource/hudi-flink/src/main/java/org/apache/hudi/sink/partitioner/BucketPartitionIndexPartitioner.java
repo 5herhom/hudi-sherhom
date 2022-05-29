@@ -22,6 +22,8 @@ import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.index.bucket.BucketIdentifier;
 import org.apache.hudi.util.StreamerUtil;
+import org.apache.hudi.util.bucket.SubTaskAssign;
+import org.apache.hudi.util.bucket.SubTaskAssignInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,43 +39,34 @@ import java.util.stream.Stream;
  */
 public class BucketPartitionIndexPartitioner<T extends HoodieKey> implements Partitioner<T> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(BucketPartitionIndexPartitioner.class);
-  private final int bucketNum;
-  private final String indexKeyFields;
+    private static final Logger LOG = LoggerFactory.getLogger(BucketPartitionIndexPartitioner.class);
+    private final int bucketNum;
+    private final String indexKeyFields;
+    private final BucketIndexPartitioner<String> partitioner;
+    private transient SubTaskAssign subTaskAssign = null;
 
-  public BucketPartitionIndexPartitioner(int bucketNum, String indexKeyFields) {
-    this.bucketNum = bucketNum;
-    this.indexKeyFields = indexKeyFields;
-  }
+    public BucketPartitionIndexPartitioner(int bucketNum, String indexKeyFields) {
+        this.bucketNum = bucketNum;
+        this.indexKeyFields = indexKeyFields;
+        partitioner = new BucketIndexPartitioner(bucketNum, indexKeyFields);
+    }
 
-  @Override
-  public int partition(HoodieKey key, int totalOfSubTask) {
-    int curBucket = BucketIdentifier.getBucketId(key, indexKeyFields, bucketNum);
-    if (totalOfSubTask <= bucketNum) {
-      return BucketIdentifier.mod(curBucket, totalOfSubTask);
+    @Override
+    public int partition(HoodieKey key, int totalOfSubTask) {
+        if (totalOfSubTask <= bucketNum) {
+            return partitioner.partition(key.getRecordKey(), totalOfSubTask);
+        }
+        int curBucket = BucketIdentifier.getBucketId(key, indexKeyFields, bucketNum);
+        if (subTaskAssign == null) {
+            load(totalOfSubTask);
+        }
+        String partitionPath = key.getPartitionPath();
+        SubTaskAssignInfo subTaskAssignInfo = subTaskAssign.assignTask(curBucket, Math.abs(partitionPath.hashCode()));
+
+        return subTaskAssignInfo.getTaskId();
     }
-    int taskGroupBaseSize = totalOfSubTask / bucketNum;
-//    The head of {totalOfSubTask % bucketNum} task groups' size should be added by 1.
-    int numOfTaskThatShouldBeCompensated = totalOfSubTask % bucketNum;
-    int taskGroupNo = BucketIdentifier.mod(curBucket, bucketNum);
-    int realGroupSize = taskGroupNo < numOfTaskThatShouldBeCompensated ? taskGroupBaseSize + 1 : taskGroupBaseSize;
-    String partitionPath = key.getPartitionPath();
-    int taskNoInGroup = Math.abs(partitionPath.hashCode()) % realGroupSize;
-    int subTaskNumBeforeCurGroup = taskGroupNo < numOfTaskThatShouldBeCompensated ?
-      taskGroupNo * (taskGroupBaseSize + 1) :
-      numOfTaskThatShouldBeCompensated * (taskGroupBaseSize + 1) + (taskGroupNo - numOfTaskThatShouldBeCompensated) * taskGroupBaseSize;
-    int curSubTaskNo = subTaskNumBeforeCurGroup + taskNoInGroup;
-    if (curSubTaskNo < 0 || curSubTaskNo >= totalOfSubTask) {
-      LOG.error("Error in partition result subTaskNo:" + curSubTaskNo);
-      LOG.error("Error in partition result,"
-        + " | bucketNum:" + bucketNum
-        + " | indexKeyFields:" + indexKeyFields
-        + " | key:" + key
-        + " | curBucketId:" + curBucket
-        + " | totalOfSubTask:" + totalOfSubTask
-        + " | taskGroupNo:" + taskGroupNo
-      );
+
+    private synchronized void load(int totalOfTask) {
+        subTaskAssign = new SubTaskAssign(bucketNum, totalOfTask);
     }
-    return curSubTaskNo;
-  }
 }
