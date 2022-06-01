@@ -153,15 +153,17 @@ public class ScheduleCompactionActionExecutor<T extends HoodieRecordPayload, I, 
     switch (compactionTriggerStrategy) {
       case NUM_COMMITS:
         compactable = inlineCompactDeltaCommitMax <= latestDeltaCommitInfo.getLeft();
-        if (compactable) {
-          LOG.info(String.format("The delta commits >= %s, trigger compaction scheduler.", inlineCompactDeltaCommitMax));
-        }
+        LOG.info(String.format("The delta commits %s %s %s, trigger compaction scheduler.", latestDeltaCommitInfo.getLeft(),compactable?">=":"<",inlineCompactDeltaCommitMax));
         break;
       case TIME_ELAPSED:
         compactable = inlineCompactDeltaSecondsMax <= parsedToSeconds(instantTime) - parsedToSeconds(latestDeltaCommitInfo.getRight());
         if (compactable) {
           LOG.info(String.format("The elapsed time >=%ss, trigger compaction scheduler.", inlineCompactDeltaSecondsMax));
         }
+        LOG.info(String.format("The elapsed %ss %s %ss, trigger compaction scheduler.",
+          parsedToSeconds(instantTime) - parsedToSeconds(latestDeltaCommitInfo.getRight()),
+          compactable?">=":"<",inlineCompactDeltaSecondsMax));
+
         break;
       case NUM_OR_TIME:
         compactable = inlineCompactDeltaCommitMax <= latestDeltaCommitInfo.getLeft()

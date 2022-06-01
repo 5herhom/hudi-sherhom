@@ -57,10 +57,11 @@ public class CompactionUtil {
    * @param committed           Whether the last instant was committed successfully
    */
   public static void scheduleCompaction(
-      HoodieTableMetaClient metaClient,
-      HoodieFlinkWriteClient<?> writeClient,
-      boolean deltaTimeCompaction,
-      boolean committed) {
+    HoodieTableMetaClient metaClient,
+    HoodieFlinkWriteClient<?> writeClient,
+    boolean deltaTimeCompaction,
+    boolean committed) {
+    LOG.info("committed result:{},deltaTimeCompaction:{}", committed, deltaTimeCompaction);
     if (committed) {
       writeClient.scheduleCompaction(Option.empty());
     } else if (deltaTimeCompaction) {
@@ -79,9 +80,9 @@ public class CompactionUtil {
    */
   public static Option<String> getCompactionInstantTime(HoodieTableMetaClient metaClient) {
     Option<HoodieInstant> firstPendingInstant = metaClient.getCommitsTimeline()
-        .filterPendingExcludingCompaction().firstInstant();
+      .filterPendingExcludingCompaction().firstInstant();
     Option<HoodieInstant> lastCompleteInstant = metaClient.getActiveTimeline().getWriteTimeline()
-        .filterCompletedAndCompactionInstants().lastInstant();
+      .filterCompletedAndCompactionInstants().lastInstant();
     if (firstPendingInstant.isPresent() && lastCompleteInstant.isPresent()) {
       String firstPendingTimestamp = firstPendingInstant.get().getTimestamp();
       String lastCompleteTimestamp = lastCompleteInstant.get().getTimestamp();
@@ -168,9 +169,9 @@ public class CompactionUtil {
    */
   public static void rollbackCompaction(HoodieFlinkTable<?> table) {
     HoodieTimeline inflightCompactionTimeline = table.getActiveTimeline()
-        .filterPendingCompactionTimeline()
-        .filter(instant ->
-            instant.getState() == HoodieInstant.State.INFLIGHT);
+      .filterPendingCompactionTimeline()
+      .filter(instant ->
+        instant.getState() == HoodieInstant.State.INFLIGHT);
     inflightCompactionTimeline.getInstants().forEach(inflightInstant -> {
       LOG.info("Rollback the inflight compaction instant: " + inflightInstant + " for failover");
       table.rollbackInflightCompaction(inflightInstant);
@@ -187,9 +188,9 @@ public class CompactionUtil {
    */
   public static void rollbackEarliestCompaction(HoodieFlinkTable<?> table, Configuration conf) {
     Option<HoodieInstant> earliestInflight = table.getActiveTimeline()
-        .filterPendingCompactionTimeline()
-        .filter(instant ->
-            instant.getState() == HoodieInstant.State.INFLIGHT).firstInstant();
+      .filterPendingCompactionTimeline()
+      .filter(instant ->
+        instant.getState() == HoodieInstant.State.INFLIGHT).firstInstant();
     if (earliestInflight.isPresent()) {
       HoodieInstant instant = earliestInflight.get();
       String currentTime = HoodieActiveTimeline.createNewInstantTime();

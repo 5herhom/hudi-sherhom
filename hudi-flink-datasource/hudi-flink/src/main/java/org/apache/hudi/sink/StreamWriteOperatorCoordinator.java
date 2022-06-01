@@ -239,8 +239,8 @@ public class StreamWriteOperatorCoordinator
           // the stream write task snapshot and flush the data buffer synchronously in sequence,
           // so a successful checkpoint subsumes the old one(follows the checkpoint subsuming contract)
           final boolean committed = commitInstant(this.instant, checkpointId);
-
           if (tableState.scheduleCompaction) {
+            LOG.info("Try to schedule compaction.");
             // if async compaction is on, schedule the compaction
             CompactionUtil.scheduleCompaction(metaClient, writeClient, tableState.isDeltaTimeCompaction, committed);
           }
@@ -611,10 +611,23 @@ public class StreamWriteOperatorCoordinator
       this.syncHive = conf.getBoolean(FlinkOptions.HIVE_SYNC_ENABLED);
       this.syncMetadata = conf.getBoolean(FlinkOptions.METADATA_ENABLED);
       this.isDeltaTimeCompaction = OptionsResolver.isDeltaTimeCompaction(conf);
+      LOG.info(this.toString());
     }
-
     public static TableState create(Configuration conf) {
       return new TableState(conf);
+    }
+
+    @Override
+    public String toString() {
+      return "TableState{" +
+        "operationType=" + operationType +
+        ", commitAction='" + commitAction + '\'' +
+        ", isOverwrite=" + isOverwrite +
+        ", scheduleCompaction=" + scheduleCompaction +
+        ", syncHive=" + syncHive +
+        ", syncMetadata=" + syncMetadata +
+        ", isDeltaTimeCompaction=" + isDeltaTimeCompaction +
+        '}';
     }
   }
 }
