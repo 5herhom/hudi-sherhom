@@ -20,6 +20,7 @@ package org.apache.hudi.common.fs;
 
 import org.apache.hudi.common.metrics.Registry;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.log.HoodieLogFormatWriter;
 import org.apache.hudi.common.util.HoodieTimer;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieIOException;
@@ -49,6 +50,9 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hudi.hadoop.CachingPath;
+import org.apache.hudi.util.StackUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -65,6 +69,7 @@ import java.util.concurrent.TimeoutException;
  * support getting the written size to each of the open streams.
  */
 public class HoodieWrapperFileSystem extends FileSystem {
+  private static final Logger LOG = LoggerFactory.getLogger(HoodieWrapperFileSystem.class);
 
   public static final String HOODIE_SCHEME_PREFIX = "hoodie-";
 
@@ -306,7 +311,6 @@ public class HoodieWrapperFileSystem extends FileSystem {
   public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) throws IOException {
     return wrapOutputStream(f, fileSystem.append(convertToDefaultPath(f), bufferSize, progress));
   }
-
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
     return executeFuncWithTimeMetrics(MetricName.rename.name(), src, () -> {

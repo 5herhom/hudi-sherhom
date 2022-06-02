@@ -48,168 +48,165 @@ import java.util.*;
  */
 public class BucketStreamWriteFunction<I> extends StreamWriteFunction<I> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(BucketStreamWriteFunction.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BucketStreamWriteFunction.class);
 
-    private int parallelism;
+  private int parallelism;
 
-    private int bucketNum;
+  private int bucketNum;
 
-    private String indexKeyFields;
+  private String indexKeyFields;
 
-    /**
-     * BucketID should be loaded in this task.
-     */
-    private Set<Integer> bucketToLoad;
+  /**
+   * BucketID should be loaded in this task.
+   */
+  private Set<Integer> bucketToLoad;
 
-    /**
-     * BucketID to file group mapping in each partition.
-     * Map(partition -> Map(bucketId, fileID)).
-     */
-    private Map<String, Map<Integer, String>> bucketIndex;
+  /**
+   * BucketID to file group mapping in each partition.
+   * Map(partition -> Map(bucketId, fileID)).
+   */
+  private Map<String, Map<Integer, String>> bucketIndex;
 
-    /**
-     * Incremental bucket index of the current checkpoint interval,
-     * it is needed because the bucket type('I' or 'U') should be decided based on the committed files view,
-     * all the records in one bucket should have the same bucket type.
-     */
-    private Set<String> incBucketIndex;
+  /**
+   * Incremental bucket index of the current checkpoint interval,
+   * it is needed because the bucket type('I' or 'U') should be decided based on the committed files view,
+   * all the records in one bucket should have the same bucket type.
+   */
+  private Set<String> incBucketIndex;
 
-    /**
-     * Returns whether this is an empty table.
-     */
-    private boolean isEmptyTable;
 
-    /**
-     * Constructs a BucketStreamWriteFunction.
-     *
-     * @param config The config options
-     */
-    public BucketStreamWriteFunction(Configuration config) {
-        super(config);
+  /**
+   * Constructs a BucketStreamWriteFunction.
+   *
+   * @param config The config options
+   */
+  public BucketStreamWriteFunction(Configuration config) {
+    super(config);
+  }
+
+  @Override
+  public void open(Configuration parameters) throws IOException {
+    super.open(parameters);
+    this.bucketNum = config.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
+    this.indexKeyFields = config.getString(FlinkOptions.INDEX_KEY_FIELD);
+    this.taskID = getRuntimeContext().getIndexOfThisSubtask();
+    this.parallelism = getRuntimeContext().getNumberOfParallelSubtasks();
+    this.bucketToLoad = getBucketToLoad(parameters);
+    this.bucketIndex = new HashMap<>();
+    this.incBucketIndex = new HashSet<>();
+  }
+
+  @Override
+  public void initializeState(FunctionInitializationContext context) throws Exception {
+    super.initializeState(context);
+  }
+
+  @Override
+  public void snapshotState() {
+    super.snapshotState();
+    this.incBucketIndex.clear();
+  }
+
+  @Override
+  public void processElement(I i, ProcessFunction<I, Object>.Context context, Collector<Object> collector) throws Exception {
+    HoodieRecord<?> record = (HoodieRecord<?>) i;
+    final HoodieKey hoodieKey = record.getKey();
+    final String partition = hoodieKey.getPartitionPath();
+    final HoodieRecordLocation location;
+
+    bootstrapIndexIfNeed(partition);
+    Map<Integer, String> bucketToFileId = bucketIndex.computeIfAbsent(partition, p -> new HashMap<>());
+    final int bucketNum = BucketIdentifier.getBucketId(hoodieKey, indexKeyFields, this.bucketNum);
+    final String bucketId = partition + bucketNum;
+
+    if (incBucketIndex.contains(bucketId)) {
+      location = new HoodieRecordLocation("I", bucketToFileId.get(bucketNum));
+    } else if (bucketToFileId.containsKey(bucketNum)) {
+      location = new HoodieRecordLocation("U", bucketToFileId.get(bucketNum));
+    } else {
+      String newFileId = BucketIdentifier.newBucketFileIdPrefix(bucketNum);
+      location = new HoodieRecordLocation("I", newFileId);
+      bucketToFileId.put(bucketNum, newFileId);
+      incBucketIndex.add(bucketId);
     }
+    record.unseal();
+    record.setCurrentLocation(location);
+    record.seal();
+    bufferRecord(record);
+  }
 
-    @Override
-    public void open(Configuration parameters) throws IOException {
-        super.open(parameters);
-        this.bucketNum = config.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
-        this.indexKeyFields = config.getString(FlinkOptions.INDEX_KEY_FIELD);
-        this.taskID = getRuntimeContext().getIndexOfThisSubtask();
-        this.parallelism = getRuntimeContext().getNumberOfParallelSubtasks();
-        this.bucketToLoad = getBucketToLoad(parameters);
-        this.bucketIndex = new HashMap<>();
-        this.incBucketIndex = new HashSet<>();
-        this.isEmptyTable = !this.metaClient.getActiveTimeline().filterCompletedInstants().lastInstant().isPresent();
+  /**
+   * Bootstrap bucket info from existing file system,
+   * bucketNum % totalParallelism == this taskID belongs to this task.
+   */
+  private Set<Integer> getBucketToLoad(Configuration config) {
+    String partitionerType = config.get(FlinkOptions.BUCKET_INDEX_PARTITIONER_TYPE);
+    Set<Integer> bucketToLoad;
+    if (FlinkOptions.BUCKET_PARTITIONER_KEY_INDEX_TYPE.equals(partitionerType)) {
+      bucketToLoad = getKeyTypePartitionerBucketToLoad();
+    } else if (FlinkOptions.BUCKET_PARTITIONER_KEY_PARTITION_INDEX_TYPE.equals(partitionerType)) {
+      bucketToLoad = getKeyPartitionPartitionerTypeBucketToLoad();
+    } else {
+      throw new HoodieNotSupportedException("Not support key["
+        + FlinkOptions.BUCKET_INDEX_PARTITIONER_TYPE + "],value[" + partitionerType + "]");
     }
+    LOG.info("Bucket number that belongs to task [{}/{}]: {}", taskID, parallelism, bucketToLoad);
+    return bucketToLoad;
+  }
 
-    @Override
-    public void initializeState(FunctionInitializationContext context) throws Exception {
-        super.initializeState(context);
+  private Set<Integer> getKeyPartitionPartitionerTypeBucketToLoad() {
+    if (this.parallelism <= bucketNum) {
+      return getKeyTypePartitionerBucketToLoad();
     }
+    SubTaskAssign subTaskAssign = new SubTaskAssign(bucketNum, parallelism);
+    int assignedBucketId = subTaskAssign.getTaskById(taskID).getGroupId();
+    return Collections.singleton(assignedBucketId);
+  }
 
-    @Override
-    public void snapshotState() {
-        super.snapshotState();
-        this.incBucketIndex.clear();
+  /**
+   * Bootstrap bucket info from existing file system,
+   * bucketNum % totalParallelism == this taskID belongs to this task.
+   */
+  private Set<Integer> getKeyTypePartitionerBucketToLoad() {
+    Set<Integer> bucketToLoad = new HashSet<>();
+    for (int i = 0; i < bucketNum; i++) {
+      int partitionOfBucket = BucketIdentifier.mod(i, parallelism);
+      if (partitionOfBucket == taskID) {
+        bucketToLoad.add(i);
+      }
     }
+    return bucketToLoad;
+  }
 
-    @Override
-    public void processElement(I i, ProcessFunction<I, Object>.Context context, Collector<Object> collector) throws Exception {
-        HoodieRecord<?> record = (HoodieRecord<?>) i;
-        final HoodieKey hoodieKey = record.getKey();
-        final String partition = hoodieKey.getPartitionPath();
-        final HoodieRecordLocation location;
+  /**
+   * Get partition_bucket -> fileID mapping from the existing hudi table.
+   * This is a required operation for each restart to avoid having duplicate file ids for one bucket.
+   */
+  private void bootstrapIndexIfNeed(String partition) {
+    if (bucketIndex.containsKey(partition)) {
+      return;
+    }
+    LOG.info(String.format("Loading Hoodie Table %s, with path %s", this.metaClient.getTableConfig().getTableName(),
+      this.metaClient.getBasePath() + "/" + partition));
 
-        bootstrapIndexIfNeed(partition);
-        Map<Integer, String> bucketToFileId = bucketIndex.computeIfAbsent(partition, p -> new HashMap<>());
-        final int bucketNum = BucketIdentifier.getBucketId(hoodieKey, indexKeyFields, this.bucketNum);
-        final String bucketId = partition + bucketNum;
-
-        if (incBucketIndex.contains(bucketId)) {
-            location = new HoodieRecordLocation("I", bucketToFileId.get(bucketNum));
-        } else if (bucketToFileId.containsKey(bucketNum)) {
-            location = new HoodieRecordLocation("U", bucketToFileId.get(bucketNum));
+    // Load existing fileID belongs to this task
+    Map<Integer, String> bucketToFileIDMap = new HashMap<>();
+    LOG.info("CompletedCommitsTimeline:" + this.writeClient.getHoodieTable().getCompletedCommitsTimeline());
+    this.writeClient.getHoodieTable().getFileSystemView().getAllFileGroups(partition).forEach(fileGroup -> {
+      String fileID = fileGroup.getFileGroupId().getFileId();
+      int bucketNumber = BucketIdentifier.bucketIdFromFileId(fileID);
+      if (bucketToLoad.contains(bucketNumber)) {
+        LOG.info("Found fileId in " + fileGroup);
+        LOG.info(String.format("Should load this partition bucket %s with fileID %s", bucketNumber, fileID));
+        if (bucketToFileIDMap.containsKey(bucketNumber)) {
+          throw new RuntimeException(String.format("Duplicate fileID %s from bucket %s of partition %s found "
+            + "during the BucketStreamWriteFunction index bootstrap.", fileID, bucketNumber, partition));
         } else {
-            String newFileId = BucketIdentifier.newBucketFileIdPrefix(bucketNum);
-            location = new HoodieRecordLocation("I", newFileId);
-            bucketToFileId.put(bucketNum, newFileId);
-            incBucketIndex.add(bucketId);
+          LOG.info(String.format("Adding fileID %s to the bucket %s of partition %s.", fileID, bucketNumber, partition));
+          bucketToFileIDMap.put(bucketNumber, fileID);
         }
-        record.unseal();
-        record.setCurrentLocation(location);
-        record.seal();
-        bufferRecord(record);
-    }
-
-    /**
-     * Bootstrap bucket info from existing file system,
-     * bucketNum % totalParallelism == this taskID belongs to this task.
-     */
-    private Set<Integer> getBucketToLoad(Configuration config) {
-        String partitionerType = config.get(FlinkOptions.BUCKET_INDEX_PARTITIONER_TYPE);
-        Set<Integer> bucketToLoad;
-        if (FlinkOptions.BUCKET_PARTITIONER_KEY_INDEX_TYPE.equals(partitionerType)) {
-            bucketToLoad = getKeyTypePartitionerBucketToLoad();
-        } else if (FlinkOptions.BUCKET_PARTITIONER_KEY_PARTITION_INDEX_TYPE.equals(partitionerType)) {
-            bucketToLoad = getKeyPartitionPartitionerTypeBucketToLoad();
-        } else {
-            throw new HoodieNotSupportedException("Not support key["
-                    + FlinkOptions.BUCKET_INDEX_PARTITIONER_TYPE + "],value[" + partitionerType + "]");
-        }
-        LOG.info("Bucket number that belongs to task [{}/{}]: {}", taskID, parallelism, bucketToLoad);
-        return bucketToLoad;
-    }
-
-    private Set<Integer> getKeyPartitionPartitionerTypeBucketToLoad() {
-        if (this.parallelism <= bucketNum) {
-            return getKeyTypePartitionerBucketToLoad();
-        }
-        SubTaskAssign subTaskAssign = new SubTaskAssign(bucketNum, parallelism);
-        int assignedBucketId = subTaskAssign.getTaskById(taskID).getGroupId();
-        return Collections.singleton(assignedBucketId);
-    }
-
-    /**
-     * Bootstrap bucket info from existing file system,
-     * bucketNum % totalParallelism == this taskID belongs to this task.
-     */
-    private Set<Integer> getKeyTypePartitionerBucketToLoad() {
-        Set<Integer> bucketToLoad = new HashSet<>();
-        for (int i = 0; i < bucketNum; i++) {
-            int partitionOfBucket = BucketIdentifier.mod(i, parallelism);
-            if (partitionOfBucket == taskID) {
-                bucketToLoad.add(i);
-            }
-        }
-        return bucketToLoad;
-    }
-
-    /**
-     * Get partition_bucket -> fileID mapping from the existing hudi table.
-     * This is a required operation for each restart to avoid having duplicate file ids for one bucket.
-     */
-    private void bootstrapIndexIfNeed(String partition) {
-        if (isEmptyTable || bucketIndex.containsKey(partition)) {
-            return;
-        }
-        LOG.info(String.format("Loading Hoodie Table %s, with path %s", this.metaClient.getTableConfig().getTableName(),
-                this.metaClient.getBasePath() + "/" + partition));
-
-        // Load existing fileID belongs to this task
-        Map<Integer, String> bucketToFileIDMap = new HashMap<>();
-        this.writeClient.getHoodieTable().getHoodieView().getLatestFileSlices(partition).forEach(fileSlice -> {
-            String fileID = fileSlice.getFileId();
-            int bucketNumber = BucketIdentifier.bucketIdFromFileId(fileID);
-            if (bucketToLoad.contains(bucketNumber)) {
-                LOG.info(String.format("Should load this partition bucket %s with fileID %s", bucketNumber, fileID));
-                if (bucketToFileIDMap.containsKey(bucketNumber)) {
-                    throw new RuntimeException(String.format("Duplicate fileID %s from bucket %s of partition %s found "
-                            + "during the BucketStreamWriteFunction index bootstrap.", fileID, bucketNumber, partition));
-                } else {
-                    LOG.info(String.format("Adding fileID %s to the bucket %s of partition %s.", fileID, bucketNumber, partition));
-                    bucketToFileIDMap.put(bucketNumber, fileID);
-                }
-            }
-        });
-        bucketIndex.put(partition, bucketToFileIDMap);
-    }
+      }
+    });
+    bucketIndex.put(partition, bucketToFileIDMap);
+  }
 }
