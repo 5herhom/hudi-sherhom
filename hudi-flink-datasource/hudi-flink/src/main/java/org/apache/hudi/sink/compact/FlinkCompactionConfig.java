@@ -18,6 +18,7 @@
 
 package org.apache.hudi.sink.compact;
 
+import org.apache.hudi.config.HoodieMemoryConfig;
 import org.apache.hudi.configuration.FlinkOptions;
 
 import com.beust.jcommander.Parameter;
@@ -37,6 +38,13 @@ public class FlinkCompactionConfig extends Configuration {
 
   @Parameter(names = {"--path"}, description = "Base path for the target hoodie table.", required = true)
   public String path;
+
+  // ------------------------------------------------------------------------
+  //  Hudi Write Options
+  // ------------------------------------------------------------------------
+
+  @Parameter(names = {"--spillable_map_path"}, description = "Default file path prefix for spillable map.", required = false)
+  public String spillableMapPath;
 
   // ------------------------------------------------------------------------
   //  Compaction Options
@@ -132,6 +140,8 @@ public class FlinkCompactionConfig extends Configuration {
     // use synchronous compaction always
     conf.setBoolean(FlinkOptions.COMPACTION_ASYNC_ENABLED, false);
     conf.setBoolean(FlinkOptions.COMPACTION_SCHEDULE_ENABLED, config.schedule);
+    // Map memory
+    conf.setString(HoodieMemoryConfig.SPILLABLE_MAP_BASE_PATH.key(),config.spillableMapPath);
 
     return conf;
   }
