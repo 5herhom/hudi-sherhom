@@ -118,6 +118,7 @@ public class HoodieFlinkCompactor {
    */
   public static class AsyncCompactionService extends HoodieAsyncTableService {
     private static final long serialVersionUID = 1L;
+    protected static final Logger LOG = LoggerFactory.getLogger(AsyncCompactionService.class);
 
     /**
      * Flink Compaction Config.

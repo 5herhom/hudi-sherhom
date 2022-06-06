@@ -39,7 +39,8 @@ import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.action.BaseActionExecutor;
 
 import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.text.ParseException;
@@ -50,7 +51,8 @@ import java.util.stream.Collectors;
 
 public class ScheduleCompactionActionExecutor<T extends HoodieRecordPayload, I, K, O> extends BaseActionExecutor<T, I, K, O, Option<HoodieCompactionPlan>> {
 
-  private static final Logger LOG = LogManager.getLogger(ScheduleCompactionActionExecutor.class);
+//  private static final Logger LOG = LogManager.getLogger(ScheduleCompactionActionExecutor.class);
+private static final Logger LOG = LoggerFactory.getLogger(ScheduleCompactionActionExecutor.class);
 
   private final Option<Map<String, String>> extraMetadata;
   private final HoodieCompactor compactor;
