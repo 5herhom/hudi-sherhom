@@ -129,8 +129,8 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
         incrementalFileStatus.addAll(result);
       }
     }
-    LOG.info("Found incrementalFileStatus "+incrementalFileStatus.size()+" :[" +
-      incrementalFileStatus.stream().map(e->e.getPath().toString()).collect(Collectors.joining(",")) + "]");
+    LOG.info("Found incrementalFileStatus " + incrementalFileStatus.size() + " :[" +
+      incrementalFileStatus.stream().map(e -> e.getPath().toString()).collect(Collectors.joining(",")) + "]");
     returns.addAll(incrementalFileStatus);
 
     // process non hoodie Paths next.
@@ -139,7 +139,7 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
       setInputPaths(job, nonHoodiePaths.toArray(new Path[nonHoodiePaths.size()]));
       FileStatus[] fileStatuses = doListStatus(job);
       List<FileStatus> nonHoodieFileStatus = Arrays.asList(fileStatuses);
-      LOG.info("Found nonHoodieFileStatus "+nonHoodieFileStatus.size()+" :[" + nonHoodieFileStatus.stream().map(e->e.getPath().toString()).collect(Collectors.joining(",")) + "]");
+      LOG.info("Found nonHoodieFileStatus " + nonHoodieFileStatus.size() + " :[" + nonHoodieFileStatus.stream().map(e -> e.getPath().toString()).collect(Collectors.joining(",")) + "]");
       returns.addAll(nonHoodieFileStatus);
     }
 
@@ -147,7 +147,7 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
     List<Path> snapshotPaths = inputPathHandler.getSnapshotPaths();
     if (snapshotPaths.size() > 0) {
       List<FileStatus> snapshotStatus = listStatusForSnapshotMode(job, tableMetaClientMap, snapshotPaths);
-      LOG.info("Found snapshotStatus "+snapshotStatus.size()+" :[" + snapshotStatus.stream().map(e->e.getPath().toString()).collect(Collectors.joining(",")) + "]");
+      LOG.info("Found snapshotStatus " + snapshotStatus.size() + " :[" + snapshotStatus.stream().map(e -> e.getPath().toString()).collect(Collectors.joining(",")) + "]");
       returns.addAll(snapshotStatus);
     }
     return returns.toArray(new FileStatus[0]);
@@ -201,7 +201,8 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
     if (baseFileOpt.isPresent()) {
       return getFileStatusUnchecked(baseFileOpt.get());
     } else {
-      throw new IllegalStateException("Invalid state: base-file has to be present");
+//      throw new IllegalStateException("Invalid state: base-file has to be present");
+      return null;
     }
   }
 
@@ -260,6 +261,7 @@ public class HoodieCopyOnWriteTableInputFormat extends HoodieTableInputFormat {
           .stream()
           .flatMap(Collection::stream)
           .map(fileSlice -> createFileStatusUnchecked(fileSlice, fileIndex, virtualKeyInfoOpt))
+          .filter(fileStatus -> fileStatus != null)
           .collect(Collectors.toList())
       );
     }
